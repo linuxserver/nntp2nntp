@@ -1,0 +1,176 @@
+#!/usr/pkg/bin/python2.6 -O
+
+import sys, os
+from hashlib import sha256
+from OpenSSL import SSL
+from twisted.internet import ssl, reactor
+from twisted.internet.protocol import Protocol, ServerFactory, ClientFactory, Factory
+from twisted.protocols.basic import LineReceiver
+from twisted.python import log
+try: from ConfigParser import SafeConfigParser
+except: from configparser import SafeConfigParser
+
+if len(sys.argv) != 2:
+  sys.stderr.write("Usage: %s <config_file>\n" % sys.argv[0])
+  sys.stderr.write("       %s pass\n" % sys.argv[0])
+  sys.stderr.write("\nThe nntp2nntp is an NNTP proxy with SSL support and authentication mapping.\n\n")
+  sys.stderr.write("<config_file>      Configuration file.\n")
+  sys.stderr.write("pass               Ask for password and out string for configuration.\n")
+  sys.stderr.write("\nExample of config file: (it is on stdout, you can simple redirect it)\n")
+  sys.stdout.write("""
+[server]
+use_ssl = true
+host = nntp.example.com
+port = 563
+user = myuser
+password = mypwd
+
+[proxy]
+use_ssl = true
+port = 1563
+cert file = myserver.pem
+cert key file = myserver.key
+ca file = myca.pem
+logfile = /var/log/nntp2nntp.log
+pidfile = /var/run/nntp2nntp.pid
+
+[users]
+user1    = 1b4f0e9851971998e732078544c96b36c3d01cedf7caa332359d6f1d83567014
+user2    = 60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752
+
+""")
+  sys.exit(1)
+
+if sys.argv[1].strip().upper() == 'PASS':
+  import getpass
+  pwd = getpass.getpass()
+  print sha256(pwd).hexdigest()
+  sys.exit(0)
+
+config = SafeConfigParser()
+config.read(sys.argv[1])
+
+SERVER_HOST = config.get('server', 'host')
+SERVER_PORT = config.getint('server', 'port')
+SERVER_USER = config.get('server', 'login')
+SERVER_PASS = config.get('server', 'password')
+SERVER_SSL = config.getboolean('server', 'use_ssl')
+
+PROXY_SSL = config.getboolean('proxy', 'use_ssl')
+PROXY_CERT_PEM = config.get('proxy', 'cert file')
+PROXY_CERT_KEY = config.get('proxy', 'cert key file')
+PROXY_CERT_CA  = config.get('proxy', 'ca file')
+PROXY_PORT = config.getint('proxy', 'port')
+PROXY_LOGFILE = config.get('proxy', 'logfile')
+PROXY_PIDFILE = config.get('proxy', 'pidfile')
+
+LOCAL_USERS = dict(config.items('users'))
+
+pid = os.fork()
+if pid < 0: raise SystemError("Failed to start process")
+elif pid > 0:
+  fd = open(PROXY_PIDFILE)
+  fd.write("%d" % pid)
+  fd.close()
+  sys.exit(0)
+
+close(sys.stdin)
+close(sys.stdout)
+close(sys.stderr)
+
+log.startLogging(file(PROXY_LOGFILE))
+Factory.noisy = False
+
+class NNTPProxyServer(LineReceiver):
+  clientFactory = None
+  client = None
+  auth_user = None
+
+  def connectionMade(self):
+    self.transport.pauseProducing()
+    client = self.clientFactory()
+    client.server = self
+    if SERVER_SSL:
+      reactor.connectSSL(SERVER_HOST, SERVER_PORT, client, ssl.ClientContextFactory())
+    else:
+      reactor.connectTCP(SERVER_HOST, SERVER_PORT, client)
+
+  def connectionLost(self, reason):
+    if self.client is not None:
+	self.client.transport.loseConnection()
+	self.client = None
+
+  def _lineReceivedNormal(self, line):
+    self.client.sendLine(line)
+
+  def lineReceived(self, line):
+    if line.upper().startswith('AUTHINFO USER '):
+      data = line.split(' ')
+      if len(data) == 3: self.auth_user = data[2].strip()
+      else: self.auth_user = ''
+      if LOCAL_USERS.has_key(self.auth_user):
+        self.client.sendLine('AUTHINFO USER %s' % SERVER_USER)
+      else: self.client.sendLine('AUTHINFO USER xxx')
+    elif line.upper().startswith('AUTHINFO PASS '):
+      data = line.split(' ')
+      if len(data) == 3 and LOCAL_USERS.get(self.auth_user) == sha256(data[2].strip()).hexdigest():
+	self.client.sendLine('AUTHINFO PASS %s' % SERVER_PASS)
+	log.msg("%s successfully logged in." % repr(self.auth_user))
+      else:
+        self.client.sendLine('AUTHINFO PASS xxx')
+	self.transport.loseConnection()
+	log.msg("%s login failed." % repr(self.auth_user))
+      self.lineReceived = self._lineReceivedNormal
+    else:
+      self._lineReceivedNormal(line)
+
+class NNTPProxyClient(LineReceiver):
+  server = None
+
+  def connectionMade(self):
+    self.server.client = self
+    self.server.transport.resumeProducing()
+
+  def connectionLost(self, reason):
+    if self.server is not None:
+	self.server.transport.loseConnection()
+	self.server = None
+
+  def lineReceived(self, line):
+    self.server.sendLine(line)
+
+class NNTPProxyClientFactory(ClientFactory):
+  server = None
+  protocol = NNTPProxyClient
+
+  def buildProtocol(self, *args, **kw):
+    prot = ClientFactory.buildProtocol(self, *args, **kw)
+    prot.server = self.server
+    return prot
+
+  def clientConnectionLost(self, connector, reason):
+    self.server.transport.loseConnection()
+
+  def clientConnectionFailed(self, connector, reason):
+    self.server.transport.loseConnection()
+
+def verifyCallback(connection, x509, errnum, errdepth, ok):
+  if not ok:
+    log.msg('invalid cert from subject: %s' % x509.get_subject())
+    return False
+  log.msg('accepted cert from subject: %s' % x509.get_subject())
+  return True
+
+serverFactory = ServerFactory()
+serverFactory.protocol = NNTPProxyServer
+serverFactory.protocol.clientFactory = NNTPProxyClientFactory
+if PROXY_SSL:
+  sslFactory = ssl.DefaultOpenSSLContextFactory(PROXY_CERT_PEM, PROXY_CERT_KEY)
+  sslContext = sslFactory.getContext()
+  sslContext.set_verify(SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT, verifyCallback)
+  sslContext.set_verify_depth(10)
+  sslContext.load_verify_locations(PROXY_CERT_CA)
+  reactor.listenSSL(PROXY_PORT, serverFactory, sslFactory)
+else:
+  reactor.listenTCP(PROXY_PORT, serverFactory)
+reactor.run()
