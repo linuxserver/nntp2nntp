@@ -18,14 +18,14 @@ if len(sys.argv) != 2:
   sys.stderr.write("pass               Ask for password and out string for configuration.\n")
   sys.stderr.write("\nExample of config file: (it is on stdout, you can simple redirect it)\n\n")
   sys.stdout.write("""[server]
-use_ssl = true
+use ssl = true
 host = nntp.example.com
 port = 563
 login = myuser
 password = mypwd
 
 [proxy]
-use_ssl = true
+use ssl = true
 port = 1563
 cert file = myserver.pem
 cert key = myserver.key
@@ -55,7 +55,7 @@ SERVER_USER = config.get('server', 'login')
 SERVER_PASS = config.get('server', 'password')
 SERVER_SSL = config.has_option('server', 'use ssl') and config.getboolean('server', 'use ssl') or False
 
-PROXY_SSL = config.has_option('proxy', 'use ssl') and config.getboolean('proxy', 'use_ssl') or False
+PROXY_SSL = config.has_option('proxy', 'use ssl') and config.getboolean('proxy', 'use ssl') or False
 PROXY_CERT_PEM = config.has_option('proxy', 'cert file') and config.get('proxy', 'cert file', '').strip() or ''
 PROXY_CERT_KEY = config.has_option('proxy', 'cert key') and config.get('proxy', 'cert key').strip() or ''
 PROXY_CERT_CA  = config.has_option('proxy', 'ca file') and config.get('proxy', 'ca file').strip() or ''
