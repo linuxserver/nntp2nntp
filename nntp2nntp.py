@@ -101,7 +101,7 @@ class NNTPProxyServer(LineReceiver):
       repr(self.auth_user),
       int(time.time() - self.conn_time),
       self.downloaded_bytes,
-      self.uploaded_bytes)
+      self.uploaded_bytes))
 
   def _lineReceivedNormal(self, line):
     self.downloaded_bytes += len(line)
