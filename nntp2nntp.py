@@ -50,18 +50,18 @@ config = SafeConfigParser()
 config.read(sys.argv[1])
 
 SERVER_HOST = config.get('server', 'host')
-SERVER_PORT = config.getint('server', 'port')
+SERVER_PORT = config.has_option('server', 'port') and config.getint('server', 'port') or 119
 SERVER_USER = config.get('server', 'login')
 SERVER_PASS = config.get('server', 'password')
-SERVER_SSL = config.getboolean('server', 'use_ssl')
+SERVER_SSL = config.has_option('server', 'use ssl') and config.getboolean('server', 'use ssl') or False
 
-PROXY_SSL = config.getboolean('proxy', 'use_ssl')
-PROXY_CERT_PEM = config.get('proxy', 'cert file').strip()
-PROXY_CERT_KEY = config.get('proxy', 'cert key').strip()
-PROXY_CERT_CA  = config.get('proxy', 'ca file').strip()
-PROXY_PORT = config.getint('proxy', 'port')
-PROXY_LOGFILE = config.get('proxy', 'logfile').strip()
-PROXY_PIDFILE = config.get('proxy', 'pidfile').strip()
+PROXY_SSL = config.has_option('proxy', 'use ssl') and config.getboolean('proxy', 'use_ssl') or False
+PROXY_CERT_PEM = config.has_option('proxy', 'cert file') and config.get('proxy', 'cert file', '').strip() or ''
+PROXY_CERT_KEY = config.has_option('proxy', 'cert key') and config.get('proxy', 'cert key').strip() or ''
+PROXY_CERT_CA  = config.has_option('proxy', 'ca file') and config.get('proxy', 'ca file').strip() or ''
+PROXY_PORT = config.has_option('proxy', 'port') and config.getint('proxy', 'port') or 1563
+PROXY_LOGFILE = config.has_option('proxy', 'logfile') and config.get('proxy', 'logfile').strip() or '/var/log/nntp2nntp.log'
+PROXY_PIDFILE = config.has_option('proxy', 'pidfile') and config.get('proxy', 'pidfile').strip() or '/var/run/nntp2nntp.pid'
 
 LOCAL_USERS = dict(config.items('users'))
 
@@ -72,10 +72,6 @@ elif pid > 0:
   fd.write("%d" % pid)
   fd.close()
   sys.exit(0)
-
-#sys.stdin.close()
-#sys.stdout.close()
-#sys.stderr.close()
 
 log.startLogging(file(PROXY_LOGFILE, 'a'))
 Factory.noisy = False
@@ -93,13 +89,22 @@ class NNTPProxyServer(LineReceiver):
       reactor.connectSSL(SERVER_HOST, SERVER_PORT, client, ssl.ClientContextFactory())
     else:
       reactor.connectTCP(SERVER_HOST, SERVER_PORT, client)
+    self.downloaded_bytes = 0
+    self.uploaded_bytes = 0
+    log.msg('user %s connected' % repr(self.auth_user))
 
   def connectionLost(self, reason):
     if self.client is not None:
 	self.client.transport.loseConnection()
 	self.client = None
+    log.msg('user %s disconnected: duration %d, downloaded %d, uploaded %d' % (
+      repr(self.auth_user),
+      int(time.time() - self.conn_time),
+      self.downloaded_bytes,
+      self.uploaded_bytes)
 
   def _lineReceivedNormal(self, line):
+    self.downloaded_bytes += len(line)
     self.client.sendLine(line)
 
   def lineReceived(self, line):
@@ -136,6 +141,7 @@ class NNTPProxyClient(LineReceiver):
 	self.server = None
 
   def lineReceived(self, line):
+    self.server.uploaded_bytes += len(line)
     self.server.sendLine(line)
 
 class NNTPProxyClientFactory(ClientFactory):
