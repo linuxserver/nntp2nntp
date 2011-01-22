@@ -16,20 +16,19 @@ if len(sys.argv) != 2:
   sys.stderr.write("\nThe nntp2nntp is an NNTP proxy with SSL support and authentication mapping.\n\n")
   sys.stderr.write("<config_file>      Configuration file.\n")
   sys.stderr.write("pass               Ask for password and out string for configuration.\n")
-  sys.stderr.write("\nExample of config file: (it is on stdout, you can simple redirect it)\n")
-  sys.stdout.write("""
-[server]
+  sys.stderr.write("\nExample of config file: (it is on stdout, you can simple redirect it)\n\n")
+  sys.stdout.write("""[server]
 use_ssl = true
 host = nntp.example.com
 port = 563
-user = myuser
+login = myuser
 password = mypwd
 
 [proxy]
 use_ssl = true
 port = 1563
 cert file = myserver.pem
-cert key file = myserver.key
+cert key = myserver.key
 ca file = myca.pem
 logfile = /var/log/nntp2nntp.log
 pidfile = /var/run/nntp2nntp.pid
@@ -57,28 +56,28 @@ SERVER_PASS = config.get('server', 'password')
 SERVER_SSL = config.getboolean('server', 'use_ssl')
 
 PROXY_SSL = config.getboolean('proxy', 'use_ssl')
-PROXY_CERT_PEM = config.get('proxy', 'cert file')
-PROXY_CERT_KEY = config.get('proxy', 'cert key file')
-PROXY_CERT_CA  = config.get('proxy', 'ca file')
+PROXY_CERT_PEM = config.get('proxy', 'cert file').strip()
+PROXY_CERT_KEY = config.get('proxy', 'cert key').strip()
+PROXY_CERT_CA  = config.get('proxy', 'ca file').strip()
 PROXY_PORT = config.getint('proxy', 'port')
-PROXY_LOGFILE = config.get('proxy', 'logfile')
-PROXY_PIDFILE = config.get('proxy', 'pidfile')
+PROXY_LOGFILE = config.get('proxy', 'logfile').strip()
+PROXY_PIDFILE = config.get('proxy', 'pidfile').strip()
 
 LOCAL_USERS = dict(config.items('users'))
 
 pid = os.fork()
 if pid < 0: raise SystemError("Failed to start process")
 elif pid > 0:
-  fd = open(PROXY_PIDFILE)
+  fd = open(PROXY_PIDFILE, 'w')
   fd.write("%d" % pid)
   fd.close()
   sys.exit(0)
 
-close(sys.stdin)
-close(sys.stdout)
-close(sys.stderr)
+#sys.stdin.close()
+#sys.stdout.close()
+#sys.stderr.close()
 
-log.startLogging(file(PROXY_LOGFILE))
+log.startLogging(file(PROXY_LOGFILE, 'a'))
 Factory.noisy = False
 
 class NNTPProxyServer(LineReceiver):
@@ -165,7 +164,7 @@ serverFactory = ServerFactory()
 serverFactory.protocol = NNTPProxyServer
 serverFactory.protocol.clientFactory = NNTPProxyClientFactory
 if PROXY_SSL:
-  sslFactory = ssl.DefaultOpenSSLContextFactory(PROXY_CERT_PEM, PROXY_CERT_KEY)
+  sslFactory = ssl.DefaultOpenSSLContextFactory(PROXY_CERT_KEY, PROXY_CERT_PEM)
   sslContext = sslFactory.getContext()
   sslContext.set_verify(SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT, verifyCallback)
   sslContext.set_verify_depth(10)
