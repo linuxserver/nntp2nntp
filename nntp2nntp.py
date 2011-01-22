@@ -1,6 +1,6 @@
 #!/usr/pkg/bin/python2.6 -O
 
-import sys, os
+import sys, os, time
 from hashlib import sha256
 from OpenSSL import SSL
 from twisted.internet import ssl, reactor
@@ -91,7 +91,6 @@ class NNTPProxyServer(LineReceiver):
       reactor.connectTCP(SERVER_HOST, SERVER_PORT, client)
     self.downloaded_bytes = 0
     self.uploaded_bytes = 0
-    log.msg('user %s connected' % repr(self.auth_user))
 
   def connectionLost(self, reason):
     if self.client is not None:
