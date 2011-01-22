@@ -104,7 +104,7 @@ class NNTPProxyServer(LineReceiver):
       self.uploaded_bytes))
 
   def _lineReceivedNormal(self, line):
-    self.downloaded_bytes += len(line)
+    self.uploaded_bytes += len(line)
     self.client.sendLine(line)
 
   def lineReceived(self, line):
@@ -141,7 +141,7 @@ class NNTPProxyClient(LineReceiver):
 	self.server = None
 
   def lineReceived(self, line):
-    self.server.uploaded_bytes += len(line)
+    self.server.downloaded_bytes += len(line)
     self.server.sendLine(line)
 
 class NNTPProxyClientFactory(ClientFactory):
