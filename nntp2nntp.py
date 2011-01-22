@@ -91,6 +91,7 @@ class NNTPProxyServer(LineReceiver):
       reactor.connectTCP(SERVER_HOST, SERVER_PORT, client)
     self.downloaded_bytes = 0
     self.uploaded_bytes = 0
+    self.conn_time = time.time()
 
   def connectionLost(self, reason):
     if self.client is not None:
