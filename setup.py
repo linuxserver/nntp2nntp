@@ -7,7 +7,7 @@ from distutils.sysconfig import get_python_inc
 
 setup(
     name = "nntp2nntp",
-    version = "0.1",
+    version = "0.2",
     description = "The nntp2nntp is an NNTP proxy with SSL support and authentication mapping.",
     author = "Oleksandr Kozachuk",
     author_email = "ddeus.pypi@mailnull.com",

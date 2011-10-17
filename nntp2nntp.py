@@ -29,6 +29,7 @@ use ssl = true
 port = 1563
 cert file = myserver.pem
 cert key = myserver.key
+ca verification = true
 ca file = myca.pem
 logfile = /var/log/nntp2nntp.log
 pidfile = /var/run/nntp2nntp.pid
@@ -36,6 +37,10 @@ pidfile = /var/run/nntp2nntp.pid
 [users]
 user1    = 1b4f0e9851971998e732078544c96b36c3d01cedf7caa332359d6f1d83567014
 user2    = 60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752
+
+[connections]
+user1    = 10
+user2    = 20
 
 """)
   sys.exit(1)
@@ -58,12 +63,19 @@ SERVER_SSL = config.has_option('server', 'use ssl') and config.getboolean('serve
 PROXY_SSL = config.has_option('proxy', 'use ssl') and config.getboolean('proxy', 'use ssl') or False
 PROXY_CERT_PEM = config.has_option('proxy', 'cert file') and config.get('proxy', 'cert file', '').strip() or ''
 PROXY_CERT_KEY = config.has_option('proxy', 'cert key') and config.get('proxy', 'cert key').strip() or ''
-PROXY_CERT_CA  = config.has_option('proxy', 'ca file') and config.get('proxy', 'ca file').strip() or ''
+PROXY_CA_VERIFY = config.has_option('proxy', 'ca verification') and config.getboolean('proxy', 'ca verification') or False
+if PROXY_CA_VERIFY:
+    PROXY_CERT_CA  = config.has_option('proxy', 'ca file') and config.get('proxy', 'ca file').strip() or ''
 PROXY_PORT = config.has_option('proxy', 'port') and config.getint('proxy', 'port') or 1563
 PROXY_LOGFILE = config.has_option('proxy', 'logfile') and config.get('proxy', 'logfile').strip() or '/var/log/nntp2nntp.log'
 PROXY_PIDFILE = config.has_option('proxy', 'pidfile') and config.get('proxy', 'pidfile').strip() or '/var/run/nntp2nntp.pid'
 
 LOCAL_USERS = dict(config.items('users'))
+if config.has_key('connections'):
+  USER_CONNECTIONS = dict([(x, int(y)) for x,y in config.items('connections')])
+else: USER_CONNECTIONS = {}
+
+current_connections = {}
 
 pid = os.fork()
 if pid < 0: raise SystemError("Failed to start process")
@@ -97,6 +109,8 @@ class NNTPProxyServer(LineReceiver):
     if self.client is not None:
 	self.client.transport.loseConnection()
 	self.client = None
+    if current_connections.has_key(self.auth_user):
+      current_connection[self.auth_user] = max(0, current_connection[self.auth_user] - 1)
     log.msg('user %s disconnected: duration %d, downloaded %d, uploaded %d' % (
       repr(self.auth_user),
       int(time.time() - self.conn_time),
@@ -114,16 +128,25 @@ class NNTPProxyServer(LineReceiver):
       else: self.auth_user = ''
       if LOCAL_USERS.has_key(self.auth_user):
         self.client.sendLine('AUTHINFO USER %s' % SERVER_USER)
-      else: self.client.sendLine('AUTHINFO USER xxx')
+      else: self.client.sendLine('AUTHINFO USER x')
     elif line.upper().startswith('AUTHINFO PASS '):
+      login_failed = True
       data = line.split(' ')
       if len(data) == 3 and LOCAL_USERS.get(self.auth_user) == sha256(data[2].strip()).hexdigest():
-	self.client.sendLine('AUTHINFO PASS %s' % SERVER_PASS)
-	log.msg("%s successfully logged in." % repr(self.auth_user))
-      else:
-        self.client.sendLine('AUTHINFO PASS xxx')
+        if not current_connections.has_key(self.auth_user): current_connections[self.auth_user] = 1
+        else: current_connections[self.auth_user] = current_connections[self.auth_user] + 1
+        if USER_CONNECTIONS.has_key(self.auth_user):
+          if current_connections[self.auth_user] < USER_CONNECTIONS[self.auth_user]:
+            login_failed = False
+        else: login_failed = False
+
+      if login_failed:
+        self.client.sendLine('AUTHINFO PASS x')
 	self.transport.loseConnection()
-	log.msg("%s login failed." % repr(self.auth_user))
+        log.msg("%s login failed." % repr(self.auth_user))
+      else:
+        self.client.sendLine('AUTHINFO PASS %s' % SERVER_PASS)
+        log.msg("%s successfully logged in." % repr(self.auth_user))
       self.lineReceived = self._lineReceivedNormal
     else:
       self._lineReceivedNormal(line)
@@ -172,10 +195,13 @@ serverFactory.protocol.clientFactory = NNTPProxyClientFactory
 if PROXY_SSL:
   sslFactory = ssl.DefaultOpenSSLContextFactory(PROXY_CERT_KEY, PROXY_CERT_PEM)
   sslContext = sslFactory.getContext()
-  sslContext.set_verify(SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT, verifyCallback)
-  sslContext.set_verify_depth(10)
-  sslContext.load_verify_locations(PROXY_CERT_CA)
+  if PROXY_CA_VERIFY:
+      sslContext.set_verify(SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT, verifyCallback)
+      sslContext.set_verify_depth(10)
+      sslContext.load_verify_locations(PROXY_CERT_CA)
   reactor.listenSSL(PROXY_PORT, serverFactory, sslFactory)
 else:
   reactor.listenTCP(PROXY_PORT, serverFactory)
 reactor.run()
+
+# vim:sts=2:sw=2:
