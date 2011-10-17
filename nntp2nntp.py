@@ -71,7 +71,7 @@ PROXY_LOGFILE = config.has_option('proxy', 'logfile') and config.get('proxy', 'l
 PROXY_PIDFILE = config.has_option('proxy', 'pidfile') and config.get('proxy', 'pidfile').strip() or '/var/run/nntp2nntp.pid'
 
 LOCAL_USERS = dict(config.items('users'))
-if config.has_key('connections'):
+if config.has_section('connections'):
   USER_CONNECTIONS = dict([(x, int(y)) for x,y in config.items('connections')])
 else: USER_CONNECTIONS = {}
 
@@ -110,7 +110,7 @@ class NNTPProxyServer(LineReceiver):
 	self.client.transport.loseConnection()
 	self.client = None
     if current_connections.has_key(self.auth_user):
-      current_connection[self.auth_user] = max(0, current_connection[self.auth_user] - 1)
+      current_connections[self.auth_user] = max(0, current_connections[self.auth_user] - 1)
     log.msg('user %s disconnected: duration %d, downloaded %d, uploaded %d' % (
       repr(self.auth_user),
       int(time.time() - self.conn_time),
