@@ -130,26 +130,22 @@ class NNTPProxyServer(LineReceiver):
         self.client.sendLine('AUTHINFO USER %s' % SERVER_USER)
       else: self.client.sendLine('AUTHINFO USER x')
     elif line.upper().startswith('AUTHINFO PASS '):
-      login_failed = True
       data = line.split(' ')
       if len(data) == 3 and LOCAL_USERS.get(self.auth_user) == sha256(data[2].strip()).hexdigest():
         if not current_connections.has_key(self.auth_user): current_connections[self.auth_user] = 1
         else: current_connections[self.auth_user] = current_connections[self.auth_user] + 1
         if USER_CONNECTIONS.has_key(self.auth_user):
-          if current_connections[self.auth_user] < USER_CONNECTIONS[self.auth_user]:
-            login_failed = False
-        else: login_failed = False
-
-      if login_failed:
-        self.client.sendLine('AUTHINFO PASS x')
-	self.transport.loseConnection()
-        log.msg("%s login failed." % repr(self.auth_user))
-      else:
+          if current_connections[self.auth_user] > USER_CONNECTIONS[self.auth_user]:
+            self.transport.sendLine('502 Too many connections')
+            self.transport.loseConnection()
+            return
         self.client.sendLine('AUTHINFO PASS %s' % SERVER_PASS)
         log.msg("%s successfully logged in." % repr(self.auth_user))
+      else:
+        self.transport.sendLine('482 Invalid Password')
+        self.transport.loseConnection()
       self.lineReceived = self._lineReceivedNormal
-    else:
-      self._lineReceivedNormal(line)
+    else: self._lineReceivedNormal(line)
 
 class NNTPProxyClient(LineReceiver):
   server = None
