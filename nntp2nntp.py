@@ -4,7 +4,7 @@ import sys, os, time
 from hashlib import sha256
 from OpenSSL import SSL
 from twisted.internet import ssl, reactor
-from twisted.internet.protocol import Protocol, ServerFactory, ClientFactory, Factory
+from twisted.internet.protocol import ServerFactory, ClientFactory, Factory
 from twisted.protocols.basic import LineReceiver
 from twisted.python import log
 try: from ConfigParser import SafeConfigParser
