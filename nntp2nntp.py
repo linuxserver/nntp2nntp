@@ -23,6 +23,7 @@ host = nntp.example.com
 port = 563
 login = myuser
 password = mypwd
+max connections = 50
 
 [proxy]
 use ssl = true
@@ -59,6 +60,7 @@ SERVER_PORT = config.has_option('server', 'port') and config.getint('server', 'p
 SERVER_USER = config.get('server', 'login')
 SERVER_PASS = config.get('server', 'password')
 SERVER_SSL = config.has_option('server', 'use ssl') and config.getboolean('server', 'use ssl') or False
+SERVER_CONNECTIONS = config.has_option('server', 'max connections') and config.getint('server', 'max connections') or 5
 
 PROXY_SSL = config.has_option('proxy', 'use ssl') and config.getboolean('proxy', 'use ssl') or False
 PROXY_CERT_PEM = config.has_option('proxy', 'cert file') and config.get('proxy', 'cert file', '').strip() or ''
@@ -75,6 +77,7 @@ if config.has_section('connections'):
   USER_CONNECTIONS = dict([(x, int(y)) for x,y in config.items('connections')])
 else: USER_CONNECTIONS = {}
 
+current_total_connections = 0
 current_connections = {}
 
 pid = os.fork()
@@ -106,11 +109,13 @@ class NNTPProxyServer(LineReceiver):
     self.conn_time = time.time()
 
   def connectionLost(self, reason):
+    global current_total_connections
     if self.client is not None:
 	self.client.transport.loseConnection()
 	self.client = None
     if current_connections.has_key(self.auth_user):
       current_connections[self.auth_user] = max(0, current_connections[self.auth_user] - 1)
+    current_total_connections = max(0, current_total_connections - 1)
     log.msg('user %s disconnected: duration %d, downloaded %d, uploaded %d' % (
       repr(self.auth_user),
       int(time.time() - self.conn_time),
@@ -122,27 +127,32 @@ class NNTPProxyServer(LineReceiver):
     self.client.sendLine(line)
 
   def lineReceived(self, line):
+    global current_total_connections
     if line.upper().startswith('AUTHINFO USER '):
       data = line.split(' ')
       if len(data) == 3: self.auth_user = data[2].strip()
       else: self.auth_user = ''
       if LOCAL_USERS.has_key(self.auth_user):
         self.client.sendLine('AUTHINFO USER %s' % SERVER_USER)
-      else: self.client.sendLine('AUTHINFO USER x')
+      else:
+        self.sendLine('482 Invalid Username')
+        self.transport.loseConnection()
     elif line.upper().startswith('AUTHINFO PASS '):
       data = line.split(' ')
       if len(data) == 3 and LOCAL_USERS.get(self.auth_user) == sha256(data[2].strip()).hexdigest():
         if not current_connections.has_key(self.auth_user): current_connections[self.auth_user] = 1
         else: current_connections[self.auth_user] = current_connections[self.auth_user] + 1
+        current_total_connections = current_total_connections + 1
         if USER_CONNECTIONS.has_key(self.auth_user):
-          if current_connections[self.auth_user] > USER_CONNECTIONS[self.auth_user]:
-            self.transport.sendLine('502 Too many connections')
+          if current_connections[self.auth_user] > USER_CONNECTIONS[self.auth_user] \
+              or current_total_connections > SERVER_CONNECTIONS:
+            self.sendLine('502 Too many connections')
             self.transport.loseConnection()
             return
         self.client.sendLine('AUTHINFO PASS %s' % SERVER_PASS)
-        log.msg("%s successfully logged in." % repr(self.auth_user))
+        log.msg("%s successfully logged in (%d connections)" % (repr(self.auth_user), current_connections[self.auth_user]))
       else:
-        self.transport.sendLine('482 Invalid Password')
+        self.sendLine('482 Invalid Password')
         self.transport.loseConnection()
       self.lineReceived = self._lineReceivedNormal
     else: self._lineReceivedNormal(line)
