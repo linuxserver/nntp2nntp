@@ -30,20 +30,20 @@ binsearch-conform format.
     scripts = ["nntp2nntp.py", "nntppost.py"],
     keywords = ["NNTP", "OpenSSL", "Proxy"],
     classifiers = [
-      'Development Status :: 4 - Beta'
-      'Environment :: Console'
-      'Environment :: No Input/Output (Daemon)'
-      'Framework :: Twisted'
+      'Development Status :: 4 - Beta',
+      'Environment :: Console',
+      'Environment :: No Input/Output (Daemon)',
+      'Framework :: Twisted',
       'Intended Audience :: End Users/Desktop',
-      'Intended Audience : System Administrators'
-      'License : Public Domain'
-      'Operating System : POSIX'
-      'Operating System : Unix'
-      'Programming Language : Python : 2'
-      'Programming Language : Python : 2.6'
-      'Programming Language : Python : 2.7'
-      'Topic : Communications : Usenet News'
-      'Topic : Internet : Proxy Servers'
+      'Intended Audience :: System Administrators',
+      'License :: Public Domain',
+      'Operating System :: POSIX',
+      'Operating System :: Unix',
+      'Programming Language :: Python :: 2',
+      'Programming Language :: Python :: 2.6',
+      'Programming Language :: Python :: 2.7',
+      'Topic :: Communications :: Usenet News',
+      'Topic :: Internet :: Proxy Servers',
       'Topic :: Utilities',
     ],
     zip_safe = False,
