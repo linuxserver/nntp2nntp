@@ -7,7 +7,7 @@ from distutils.sysconfig import get_python_inc
 
 setup(
     name = "nntp2nntp",
-    version = "0.2",
+    version = "0.3",
     jescription = "The nntp2nntp is an NNTP proxy with SSL support and authentication mapping.",
     long_description = """NNTP2NNTP Proxy allow you to use your NNTP Account from multiple systems, each
 with own user name and password. It fully supports SSL and you can also limit
@@ -17,6 +17,9 @@ pretty fast. Additional features in 0.2:
 - Limit the number of connections for server
 - Limit the number of connections to proxy per user
 - Verification of client certificates can be disabled now
+
+It contains also a script to post yEnc-encoded files in a
+binsearch-conform format.
 """,
     author = "Oleksandr Kozachuk",
     author_email = "ddeus.pypi@mailnull.com",

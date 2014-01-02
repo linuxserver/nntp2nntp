@@ -7,7 +7,17 @@ from twisted.internet import ssl, reactor, defer
 from twisted.internet.protocol import ClientFactory
 
 if len(sys.argv) < 5:
-    raise RuntimeError("Usage: %s <from> <groups> <subject> <file1.ync> [file2.ync ...]" % sys.argv[0])
+    sys.stderr.write("Usage: %s <from> <groups> <subject> <file1.ync> [file2.ync ...]\n" % sys.argv[0])
+    sys.stderr.write("""
+The server comes from NNTPSERVER environment variable and
+authentication information should be stored in ~/.netrc.
+
+To post files they need to be encoded with yencode first:
+http://sourceforge.net/projects/yencode/
+
+The subject will be automatically extended with file information.
+""")
+    sys.exit(1)
 
 re_file_multi = re.compile(r'^=ybegin part=(?P<part>[0-9]+) total=(?P<total>[0-9]+) line=[0-9]+ size=(?P<size>[0-9]+) name=(?P<name>.*?)\s*$')
 re_file_single = re.compile(r'^=ybegin line=[0-9]+ size=(?P<size>[0-9]+) name=(?P<name>.*?)\s*$')
