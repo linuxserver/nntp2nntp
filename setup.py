@@ -24,7 +24,7 @@ pretty fast. Additional features in 0.2:
     download_url = "http://sourceforge.net/projects/nntp2nntp/",
     license = "WTFPL",
     install_requires = ['Twisted', 'pyOpenSSL'],
-    scripts = ["nntp2nntp.py"],
+    scripts = ["nntp2nntp.py", "nntppost.py"],
     keywords = ["NNTP", "OpenSSL", "Proxy"],
     classifiers = [
       'Development Status :: 4 - Beta'
