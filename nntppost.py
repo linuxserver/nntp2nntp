@@ -148,7 +148,7 @@ class PosterClient(NNTPClient):
 
 class PosterFactory(ClientFactory):
     def buildProtocol(self, addr):
-        return PosterClient(self, postFilesGenerator())
+        return PosterClient(postFilesGenerator())
 
 print "Connect to server", nntpserver
 factory = PosterFactory()
