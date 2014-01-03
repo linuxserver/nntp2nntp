@@ -101,6 +101,7 @@ def postFilesGenerator():
             msg["User-Agent"] = "postfiles.py (http://sourceforge.net/projects/nntp2nntp/)"
             msg["X-No-Archive"] = "yes"
             msg["Message-Id"] = msgid
+            msg["Newsgroups"] = ','.join(groups)
             msg["Lines"] = str(lines)
             msg["Bytes"] = str(bytecount)
             msg.set_payload(msgdata)
@@ -122,7 +123,7 @@ class PosterClient(NNTPClient):
         self.quit()
     postFailed = lambda s, e: s.failed("Posting failed", e)
     authFailed = lambda s, e: s.failed("Auth failed", e)
-    
+
     def _headerInitial(self, (code, message)):
         NNTPClient._headerInitial(self, (code, message))
         if nntpuser != None:
