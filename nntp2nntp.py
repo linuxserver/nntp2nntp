@@ -133,7 +133,8 @@ class NNTPProxyServer(LineReceiver):
       if len(data) == 3: self.auth_user = data[2].strip()
       else: self.auth_user = ''
       if LOCAL_USERS.has_key(self.auth_user):
-        self.client.sendLine('AUTHINFO USER %s' % SERVER_USER)
+        if SERVER_USER not in ('', None):
+          self.client.sendLine('AUTHINFO USER %s' % SERVER_USER)
       else:
         self.sendLine('482 Invalid Username')
         self.transport.loseConnection()
@@ -149,7 +150,8 @@ class NNTPProxyServer(LineReceiver):
             self.sendLine('502 Too many connections')
             self.transport.loseConnection()
             return
-        self.client.sendLine('AUTHINFO PASS %s' % SERVER_PASS)
+        if SERVER_PASS not in ('', None):
+          self.client.sendLine('AUTHINFO PASS %s' % SERVER_PASS)
         log.msg("%s successfully logged in (%d connections)" % (repr(self.auth_user), current_connections[self.auth_user]))
       else:
         self.sendLine('482 Invalid Password')
