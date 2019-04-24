@@ -1,1 +1,0 @@
-nntp2nntp
